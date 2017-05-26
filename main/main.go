@@ -8,12 +8,10 @@ import (
 	"bufio"
 	"fmt"
 	"math"
+	"math/rand"
 	"os"
 	"strconv"
-	"math/rand"
 	"strings"
-	//"text/scanner"
-	//"github.com/twmb/algoimpl/go/graph"
 )
 
 type ant_t struct {
@@ -22,19 +20,24 @@ type ant_t struct {
 	nextCity    int
 	tour        []int
 	tourIndex   int
-	tourlength  int
+	tourlength  float64
 }
 
 type city struct {
 	x, y float64
 }
 
-var adjMatrix [][]float64
-var tauMatrix [][]float64
-var cities []city
 var ants []ant_t
+var cities []city
+var tauMatrix [][]float64
+var adjMatrix [][]float64
+var besttour []int
+var besttourlength = 0.0
+var avgtour []int
+var currentIndex int
+var numCities = 0
 var rho = 0.6
-var qval = 1
+var qval = 1.0
 var alpha = 0.8
 var beta = 0.8
 var numAnts = 10
@@ -47,53 +50,118 @@ func printError(err error) {
 
 func main() {
 	initGraph("read")
-	numCities := len(cities)
-	for i := 0; i < numAnts; i++ {
-		
+	iterations := 0
+	initTrail()
+	for iterations < 500 {
+		initAnts()
+		moveAnts()
+		intensifyTrail()
+		updateBestTour()
+		iterations++
+	}
+	fmt.Println(besttour)
+}
+
+func updateBestTour() {
+	if besttour == nil {
+		besttour = make([]int, numCities)
+		copy(besttour, ants[0].tour)
+		besttourlength = ants[0].tourlength
+	}
+	for i := range ants {
+		if ants[i].tourlength < besttourlength {
+			besttourlength = ants[i].tourlength
+			copy(besttour, ants[i].tour)
+		}
+	}
+}
+
+//initialize tauMatrix
+func initTrail() {
+	tauMatrix = make([][]float64, numCities)
+	for i := range tauMatrix {
+		tauMatrix[i] = make([]float64, numCities)
+		for j := range tauMatrix[i] {
+			if i != j {
+				tauMatrix[i][j] = 1.0
+			} else {
+				tauMatrix[i][j] = 0.0
+			}
+		}
 	}
 }
 
 //initialize ants
 func initAnts() {
-	
+	currentIndex = -1
+	ants = make([]ant_t, numAnts)
+	for i := range ants {
+		ants[i].tabulist = make([]int, numCities)
+		ants[i].currentCity = rand.Intn(numCities)
+		ants[i].nextCity = 0
+		ants[i].tour = make([]int, numCities)
+		ants[i].tourIndex = 0
+		ants[i].tourlength = 0.0
+	}
+	currentIndex++
+}
+
+func moveAnts() {
+	for currentIndex < numCities-1 {
+		for i := range ants {
+			goToNewCity(&ants[i])
+		}
+		currentIndex++
+	}
 }
 
 //choosing next city
 func goToNewCity(ant *ant_t) {
-	numCities := len(cities)
 	var from, to int
 	var p float64
-	d := 0.0
+	denom := 0.0
 	from = ant.currentCity
 	for to = 0; to < numCities; to++ {
-		if ant.tabulist[to] == 0 {
-			d += math.Pow(tauMatrix[from][to], alpha) * math.Pow((1.0/adjMatrix[from][to]), beta)
+		if from != to {
+			if ant.tabulist[to] == 0 && tauMatrix[from][to] != 0 && adjMatrix[from][to] != 0 {
+				denom += math.Pow(tauMatrix[from][to], alpha) * math.Pow((1.0/adjMatrix[from][to]), beta)
+			}
+		} else {
+			continue
 		}
+
 	}
 	to = 0
 	for {
-		if ant.tabulist[to] == 0 {
-			p = (math.Pow(tauMatrix[from][to], alpha) * math.Pow((1.0/adjMatrix[from][to]), beta)) / d
-			if (rand.Float64() < p){
-				break
-			}
-			to = ((to + 1) % numCities)
-		}
-		ant.nextCity = to
-		ant.tabulist[ant.nextCity] = 1
-		ant.tour[ant.tourIndex++] = ant.nextCity
-		ant.tourlength += adjMatrix[ant.currentCity][ant.nextCity]
-		if ant.tourIndex == numCities {
-			ant.tourlength += adjMatrix[ant.tour[numCities-1]][ant.tour[0]]
-		}
-		ant.currentCity = ant.nextCity
-	}
+		if from != to {
+			if ant.tabulist[to] == 0 {
+				p = (math.Pow(tauMatrix[from][to], alpha) * math.Pow((1.0/adjMatrix[from][to]), beta)) / denom
 
+				if rand.Float64() < p {
+					break
+				}
+			}
+		} else {
+			to = ((to + 1) % numCities)
+			continue
+		}
+		to = ((to + 1) % numCities)
+	}
+	ant.nextCity = to
+	ant.tabulist[ant.nextCity] = 1
+	ant.tour[ant.tourIndex] = ant.nextCity
+	ant.tourIndex++
+	ant.tourlength += adjMatrix[ant.currentCity][ant.nextCity]
+	if ant.tourIndex == numCities {
+		ant.tourlength += adjMatrix[ant.tour[numCities-1]][ant.tour[0]]
+	}
+	ant.currentCity = ant.nextCity
 }
 
 //reads from file and creates a list of all the cities coordinates
-func readFile(name string) {
+func readFile(name string) []city {
 	var dim, i int
+	var cities []city
 	i, dim = 1, 0
 	var startFlag bool
 	startFlag = false
@@ -117,7 +185,6 @@ func readFile(name string) {
 				x, y := tokenize(str)
 				if i <= dim {
 					cities[i-1] = city{x, y}
-					//fmt.Println(cities[i-1])
 					i++
 				} else {
 					startFlag = false
@@ -133,17 +200,17 @@ func readFile(name string) {
 	} else {
 		printError(err)
 	}
+	return cities
 }
 
 //intensifying pheromone levels
 func intensifyTrail() {
 	var from, to, i, c int
-	numCities := len(cities)
 	for i = 0; i < numAnts; i++ {
 		for c = 0; c < numCities; c++ {
-			from = ants[i].tour[city]
-			to = ants[i].tour[((city + 1) % numCities)]
-			tauMatrix[from][to] += ((qval / ants[i].tour_length) * rho)
+			from = ants[i].tour[c]
+			to = ants[i].tour[((c + 1) % numCities)]
+			tauMatrix[from][to] += ((qval / ants[i].tourlength) * rho)
 			tauMatrix[to][from] = tauMatrix[from][to]
 		}
 	}
@@ -151,14 +218,13 @@ func intensifyTrail() {
 
 //making graph
 func initGraph(name string) {
-	readFile(name)
-	adjMatrix = make([][]float64, len(cities))
+	cities = readFile(name)
+	numCities = len(cities)
+	adjMatrix = make([][]float64, numCities)
 	for i := range adjMatrix {
-		adjMatrix[i] = make([]float64, len(cities))
+		adjMatrix[i] = make([]float64, numCities)
 		for j := range adjMatrix[i] {
-			adjMatrix[i] = make([]float64, len(cities))
 			adjMatrix[i][j] = calEdge(cities[i], cities[j])
-			fmt.Println(adjMatrix[i][j])
 		}
 	}
 }
