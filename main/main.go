@@ -1,7 +1,24 @@
 /*
-	Ant Colony Optimization for the Traveling Salesman Problem
-	Author: Taha Shaikh
-*/
+*	Author: Taha Shaikh
+*	=== Ant Colony Optimization for the Traveling Salesman Problem ===
+*
+*	=== Usage ===
+*	Comment out whichever file/data not needed and uncomment file/data at
+*	line numbers 60 and 90 to execute ACO on
+*
+*	=== Implementation ===
+*	- Reads the DIMENSION field in the file provided for the total number of cities
+*	- Reads the coordinates of each city in the NODE_COORD_SECTION and saves them in
+*	  a list of cities
+*	- Creates an adjacency matrix for the cities, computing edge weights by the
+*	  calculating the euclidean distance between every two cities
+*	- Initialize the tau matrix (pheromone levels) for each edge
+*	- initialize each ant and provide them a random city to start
+*	- Each ant traveses the path and chooses each city using a probability which
+*	  is computed using a formula
+*	- Update the tau matrix (pheromone levels) after one tour has end
+*	- Run 500 tours 10 times to obtain average and best tour length values
+ */
 package main
 
 import (
@@ -12,8 +29,14 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/gonum/plot"
+	"github.com/gonum/plot/plotter"
+	"github.com/gonum/plot/plotutil"
+	"github.com/gonum/plot/vg"
 )
 
+//ant implementation
 type ant_t struct {
 	tabulist    []int
 	currentCity int
@@ -23,17 +46,17 @@ type ant_t struct {
 	tourlength  float64
 }
 
+//city implementation
 type city struct {
 	x, y float64
 }
 
+//declaration and initialization
 var ants []ant_t
 var cities []city
 var tauMatrix [][]float64
 var adjMatrix [][]float64
 var besttour []int
-var besttourlength = 0.0
-var avgtour []int
 var currentIndex int
 var numCities = 0
 var rho = 0.6
@@ -49,41 +72,120 @@ func printError(err error) {
 }
 
 func main() {
-	initGraph("read")
+	//comment other to use the other one
+	initGraph("TSP_D")
+	//initGraph("TSP_WS") //other TSP file
+
+	avgavg := make([]float64, 10)
+	avgbest := make([]float64, 10)
+	besttourlens := make([]float64, 10)
+	avgtourlens := make([]float64, 10)
 	iterations := 0
+	i := 0
+	//initializes pheromone levels with base pheromone i.e. 1
 	initTrail()
-	for iterations < 500 {
-		initAnts()
-		moveAnts()
-		intensifyTrail()
-		updateBestTour()
-		iterations++
+	for i < 10 {
+		iterations = 0
+		besttour = nil
+		for iterations < 500 {
+			//initializes each ant
+			initAnts()
+			//tour for each ant
+			moveAnts()
+			//intensify pheromone levels
+			intensifyTrail()
+			//compute best and avg tour length for every tour in
+			//500 and add them for average
+			besttourlens[i] += calculateBest()
+			fmt.Println(calculateBest())
+			avgtourlens[i] += calculateAvg()
+			iterations++
+		}
+		//evaporate pheromone to obtain better results
+		evaporatePheromone()
+		fmt.Println("Iteration: ", i)
+
+		avgavg[i] = avgtourlens[i] / 500.0
+		avgbest[i] = besttourlens[i] / 500.0
+		fmt.Println("Optimal Path: ", avgavg)
+		i++
 	}
-	fmt.Println(besttour)
+
+	p, err := plot.New()
+	if err != nil {
+		printError(err)
+	}
+
+	//comment other to use the other one
+	//p.Title.Text = "Dijibouti TSP"
+	p.Title.Text = "Western Sahara TSP"
+	p.X.Label.Text = "X"
+	p.Y.Label.Text = "Y"
+
+	avgpts := make(plotter.XYs, 10)
+	for i := range avgpts {
+		avgpts[i].Y = avgavg[i]
+		avgpts[i].X = float64(i)
+	}
+
+	bestpts := make(plotter.XYs, 10)
+	for i := range bestpts {
+		bestpts[i].Y = avgbest[i]
+		bestpts[i].X = float64(i)
+	}
+	err = plotutil.AddLinePoints(p,
+		"Average So Far", avgpts,
+		"Best So Far", bestpts)
+	if err != nil {
+		printError(err)
+	}
+
+	// Save the plot to a PNG file.
+	/*if err := p.Save(4*vg.Inch, 4*vg.Inch, "djibouti.png"); err != nil {
+		printError(err)
+	}*/
+	if err := p.Save(4*vg.Inch, 4*vg.Inch, "westernsahara.png"); err != nil {
+		printError(err)
+	}
 }
 
-func updateBestTour() {
+//calculate average tour length of all length for one tour
+func calculateAvg() float64 {
+	avglength := ants[0].tourlength
+	total := 0.0
+	for i := range ants {
+		total += ants[i].tourlength
+	}
+	avglength = total / 10.0
+	return avglength
+}
+
+//calculate best tour length of all length for one tour
+func calculateBest() float64 {
+	var bestlength float64
+	bestlength = ants[0].tourlength
 	if besttour == nil {
 		besttour = make([]int, numCities)
 		copy(besttour, ants[0].tour)
-		besttourlength = ants[0].tourlength
 	}
 	for i := range ants {
-		if ants[i].tourlength < besttourlength {
-			besttourlength = ants[i].tourlength
+		if ants[i].tourlength < bestlength {
+
+			bestlength = ants[i].tourlength
 			copy(besttour, ants[i].tour)
 		}
 	}
+	return bestlength
 }
 
-//initialize tauMatrix
+//initialize pheromone levels
 func initTrail() {
 	tauMatrix = make([][]float64, numCities)
 	for i := range tauMatrix {
 		tauMatrix[i] = make([]float64, numCities)
 		for j := range tauMatrix[i] {
 			if i != j {
-				tauMatrix[i][j] = 1.0
+				tauMatrix[i][j] = 1.0 //initialize to base pheromone = 1
 			} else {
 				tauMatrix[i][j] = 0.0
 			}
@@ -93,25 +195,26 @@ func initTrail() {
 
 //initialize ants
 func initAnts() {
-	currentIndex = -1
+	ants = nil
 	ants = make([]ant_t, numAnts)
 	for i := range ants {
 		ants[i].tabulist = make([]int, numCities)
-		ants[i].currentCity = rand.Intn(numCities)
+		ants[i].currentCity = rand.Intn(numCities) //randomly assigns ant a city to s
 		ants[i].nextCity = 0
 		ants[i].tour = make([]int, numCities)
 		ants[i].tourIndex = 0
 		ants[i].tourlength = 0.0
 	}
-	currentIndex++
 }
 
+//move all ants to visit the whole graph
 func moveAnts() {
-	for currentIndex < numCities-1 {
-		for i := range ants {
+	for i := range ants {
+		currentIndex = 0
+		for currentIndex < numCities {
 			goToNewCity(&ants[i])
+			currentIndex++
 		}
-		currentIndex++
 	}
 }
 
@@ -203,6 +306,19 @@ func readFile(name string) []city {
 	return cities
 }
 
+//evaporating pheromone after each iteration of the algorithm
+func evaporatePheromone() {
+	var from, to int
+	for from = 0; from < numCities; from++ {
+		for to = 0; to < numCities; to++ {
+			tauMatrix[from][to] = tauMatrix[from][to] * (1.0 - rho)
+			if tauMatrix[from][to] < 0.0 {
+				tauMatrix[from][to] = 1.0
+			}
+		}
+	}
+}
+
 //intensifying pheromone levels
 func intensifyTrail() {
 	var from, to, i, c int
@@ -210,7 +326,8 @@ func intensifyTrail() {
 		for c = 0; c < numCities; c++ {
 			from = ants[i].tour[c]
 			to = ants[i].tour[((c + 1) % numCities)]
-			tauMatrix[from][to] += ((qval / ants[i].tourlength) * rho)
+			deltatau := (qval / ants[i].tourlength)
+			tauMatrix[from][to] = tauMatrix[from][to] + deltatau
 			tauMatrix[to][from] = tauMatrix[from][to]
 		}
 	}
