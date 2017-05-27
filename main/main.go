@@ -73,8 +73,8 @@ func printError(err error) {
 
 func main() {
 	//comment other to use the other one
-	initGraph("TSP_D")
-	//initGraph("TSP_WS") //other TSP file
+	//initGraph("TSP_D")
+	initGraph("TSP_WS") //other TSP file
 
 	avgavg := make([]float64, 10)
 	avgbest := make([]float64, 10)
@@ -97,19 +97,19 @@ func main() {
 			//compute best and avg tour length for every tour in
 			//500 and add them for average
 			besttourlens[i] += calculateBest()
-			fmt.Println(calculateBest())
 			avgtourlens[i] += calculateAvg()
 			iterations++
 		}
 		//evaporate pheromone to obtain better results
 		evaporatePheromone()
 		fmt.Println("Iteration: ", i)
-
+		fmt.Println("Optimal Path: ", besttour)
 		avgavg[i] = avgtourlens[i] / 500.0
 		avgbest[i] = besttourlens[i] / 500.0
-		fmt.Println("Optimal Path: ", avgavg)
 		i++
 	}
+	fmt.Println("Average Average:", avgavg)
+	fmt.Println("Average Best:", avgavg)
 
 	p, err := plot.New()
 	if err != nil {
