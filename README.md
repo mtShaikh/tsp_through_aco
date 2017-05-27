@@ -14,4 +14,4 @@ requires mercurial to be installed in the system
 and then run 
 `$ $GOPATH/bin/main`
 ## Other Details
-The implementation only considers the ```DIMENSION``` and ```NODE_COORD_SECTION``` fields. It uses the former to get the total number of cities and the latter to get the coordinates of those cities 
+The implementation only considers the ```DIMENSION``` and ```NODE_COORD_SECTION``` fields in the files given. It uses the former to get the total number of cities and the latter to get the coordinates of those cities 
