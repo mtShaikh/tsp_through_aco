@@ -9,8 +9,7 @@ requires mercurial to be installed in the system
 ## Usage
 (Assuming Go is installed and $GOPATH points to the proper directory...if not then refer [here](https://golang.org/doc/install) for installation and  [here](https://golang.org/doc/code.html) for post installation setup.)
 
->Run this command in the directory where main.go file is:
-`$ go install`
+>Run `$ go install` command in the directory where main.go file is:
 and then run 
 `$ $GOPATH/bin/main`
 ## Other Details
