@@ -1,6 +1,7 @@
 # Implementation of Ant Colony Optimisation for the Travelling Salesman Problem
 
 Implemeted using Golang
+
 See main.go for more details
 ## Dependancies
 [gonum/plot graphing library](https://github.com/gonum/plot)
