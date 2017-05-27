@@ -109,7 +109,7 @@ func main() {
 		i++
 	}
 	fmt.Println("Average Average:", avgavg)
-	fmt.Println("Average Best:", avgavg)
+	fmt.Println("Average Best:", avgbest)
 
 	p, err := plot.New()
 	if err != nil {
