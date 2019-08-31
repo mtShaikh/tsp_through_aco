@@ -348,7 +348,7 @@ func initGraph(name string) {
 
 //calculates edge weight (euclidiean distance)
 func calEdge(c1, c2 city) float64 {
-	return math.Pow((math.Pow((c2.y-c1.y), 2) + math.Pow((c2.y-c1.y), 2)), 0.5)
+	return math.Pow((math.Pow((c2.x-c1.x), 2) + math.Pow((c2.y-c1.y), 2)), 0.5)
 }
 
 //tokenizes and converts to float
